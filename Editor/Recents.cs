@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using Ludiq.OdinSerializer.Utilities;
+using Sirenix.Utilities;
 using UnityEditor;
 using UnityEngine;
 
 public class Recents : EditorWindow, ISerializationCallbackReceiver
 {
+    static readonly int SIZE = 30;
     bool initialized;
     [SerializeField] Item[] cache;
     Queue<Item> recentObjects;
@@ -17,6 +20,9 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
         EditorWindow.GetWindow(typeof(Recents));
     }
 
+    GUIStyle styleAvailable, styleUnavailable;
+    GUIContent outOfScope = new GUIContent("Selected object\nis out of scope!");
+
     void OnEnable ()
     {
         initialized = false;
@@ -25,6 +31,20 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
     void OnGUI ()
     {
         if (!initialized) Initialize();
+
+        if (styleAvailable == null)
+        {
+            styleAvailable = new GUIStyle(GUI.skin.button);
+            styleAvailable.fontSize = 16;
+            styleAvailable.alignment = TextAnchor.MiddleLeft;
+        }
+        if (styleUnavailable == null)
+        {
+            styleUnavailable = new GUIStyle(GUI.skin.button);
+            styleUnavailable.normal.textColor = Color.grey;
+            styleUnavailable.alignment = TextAnchor.MiddleLeft;
+            styleUnavailable.fontSize = 12;
+        }
 
         EditorGUIUtility.SetIconSize(new Vector2(24f, 24f));
         if (recentObjects.Count == 0) return;
@@ -38,9 +58,28 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
         {
             while (e.MoveNext())
             {
-                rect = new Rect(0, (size - index - 1) * 36, position.width, 32);
-                if (GUI.Button(rect, e.Current.guiContent))
-                    Selection.SetActiveObjectWithContext(e.Current.obj, null);
+                int y = (size - index - 1) * 33;
+                if (y > position.height)
+                {
+                    index++;
+                    continue;
+                }
+
+                bool available = true;
+                if (e.Current.obj == null) available = false;
+                if (e.Current.guiContent == null)
+                    e.Current.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(UnityEditor.Selection.activeObject, null));
+
+                rect = new Rect(0, y, position.width, 32);
+                if (GUI.Button(rect, e.Current.guiContent, available? styleAvailable : styleUnavailable))
+                {
+                    if (available)
+                    {
+                        Selection.SetActiveObjectWithContext(e.Current.obj, null);
+                        selectingWithin = e.Current.obj;
+                    }
+                    else ShowNotification(outOfScope);
+                }
                 index++;
             }
         }
@@ -49,7 +88,7 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
     void Initialize()
     {
         if (recentObjects == null) recentObjects = new Queue<Item>();
-        pool = new Stack<Item>(50);
+        pool = new Stack<Item>(SIZE);
         initialized = true;
     }
 
@@ -59,19 +98,29 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
         else return new Item();
     }
 
+    UnityEngine.Object selectingWithin;
+
     void OnSelectionChange()
     {
         if (UnityEditor.Selection.activeObject == null) return;
+
+        UnityEngine.Object last = UnityEditor.Selection.objects[Selection.objects.Length - 1];
+        if (last == selectingWithin) return;
+
         Item i = GetItemFromPool();
-        i.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(UnityEditor.Selection.activeObject, null));;
-        i.obj = UnityEditor.Selection.activeObject;
+        i.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(last, null));
+        i.obj = last;
         recentObjects.Enqueue(i);
-        if (recentObjects.Count > 50) pool.Push(recentObjects.Dequeue());
+        if (recentObjects.Count >= SIZE) pool.Push(recentObjects.Dequeue());
         Repaint();
     }
     public void OnBeforeSerialize()
     {
-        if (cache == null) cache = new Item[50];
+        if (cache == null) cache = new Item[SIZE];
+        else
+        {
+            for (int i = 0; i < cache.Length; i++) cache[i] = null;
+        }
         int index = 0;
         using (var e = recentObjects.GetEnumerator())
         {
@@ -85,15 +134,15 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
 
     public void OnAfterDeserialize()
     {
-        if (recentObjects == null) recentObjects = new Queue<Item>(50);
+        if (recentObjects == null) recentObjects = new Queue<Item>(SIZE);
         else recentObjects.Clear();
 
         if (cache == null) return;
 
         for (int i = 0; i < cache.Length; i++)
         {
-            if (cache[i] != null) recentObjects.Enqueue(cache[i]);
-            else break;
+            if (cache[i] == null || cache[i].obj == null) continue;
+            recentObjects.Enqueue(cache[i]);
         }
     }
 
