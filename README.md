@@ -1,4 +1,4 @@
 # Recents
-Unity plugin. Minimal. Shows recently selected objects on a panel. Last on top.
+Unity plugin. Minimal. Shows recently selected objects on a panel. Last on top. Efficient.
 
-![圖片](https://imgur.com/f9Mo2L3.jpg)
+![圖片](https://imgur.com/g0azi6Z.jpg)
