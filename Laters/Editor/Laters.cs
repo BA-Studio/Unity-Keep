@@ -4,7 +4,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Experimental.UIElements;
 
-public class Laters : EditorWindow, ISerializationCallbackReceiver
+public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMenu
 {
     static readonly int SIZE = 30;
     bool initialized;
@@ -20,7 +20,7 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver
 
     GUIStyle styleAvailable, styleUnavailable;
     GUIContent outOfScope = new GUIContent("Selected object\nis out of scope!");
-    GUIContent full = new GUIContent("Storage full! Clear the list for better productivity. Max: " + SIZE);
+    GUIContent full = new GUIContent("Storage full!\nClear the list for\nbest productivity👊");
     bool latersEnabled;
 
     void OnEnable ()
@@ -139,6 +139,17 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver
     void UpdateCount ()
     {
         this.titleContent.text = string.Concat("Laters ", markedObjects.Count, "/", SIZE);
+    }
+
+    public void AddItemsToMenu(GenericMenu menu)
+    {
+        menu.AddItem(new GUIContent("Clear"), false, Clear);
+    }
+
+    public void Clear ()
+    {
+        markedObjects.Clear();
+        UpdateCount();
     }
 
     void Initialize()
