@@ -1,27 +1,27 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
-using Ludiq.OdinSerializer.Utilities;
-using Sirenix.Utilities;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Experimental.UIElements;
 
-public class Recents : EditorWindow, ISerializationCallbackReceiver
+public class Laters : EditorWindow, ISerializationCallbackReceiver
 {
     static readonly int SIZE = 30;
     bool initialized;
     [SerializeField] Item[] cache;
-    Queue<Item> recentObjects;
+    HashSet<Item> markedObjects;
     Stack<Item> pool;
 
-    [MenuItem("Window/Recents")]
+    [MenuItem("Window/BAStudio/Laters")]
     public static void ShowWindow()
     {
-        EditorWindow.GetWindow(typeof(Recents));
+        EditorWindow.GetWindow<Laters>();
     }
 
     GUIStyle styleAvailable, styleUnavailable;
     GUIContent outOfScope = new GUIContent("Selected object\nis out of scope!");
+    GUIContent full = new GUIContent("Storage full! Clear the list for better productivity. Max: " + SIZE);
+    bool latersEnabled;
 
     void OnEnable ()
     {
@@ -46,19 +46,41 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
             styleUnavailable.fontSize = 12;
         }
 
+        bool repaint = false;
+
+		if (Event.current.type == EventType.DragUpdated)
+		{
+			DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+			Event.current.Use();
+		}
+        else if (Event.current.type == EventType.DragPerform)
+        {
+            for (int i = 0; i < DragAndDrop.objectReferences.Length; i++)
+            {
+                if (!AddItem(DragAndDrop.objectReferences[i], true)) break;
+            }
+
+            DragAndDrop.AcceptDrag();
+            Event.current.Use();
+
+            repaint = true;
+            // Repaint();
+            return;
+        }
+
         EditorGUIUtility.SetIconSize(new Vector2(24f, 24f));
-        if (recentObjects.Count == 0) return;
+        if (markedObjects.Count == 0) return;
 
         Rect rect;
         int size, index;
-        size = recentObjects.Count;
+        size = markedObjects.Count;
         index = 0;
 
-        using (var e = recentObjects.GetEnumerator())
+        using (var e = markedObjects.GetEnumerator())
         {
             while (e.MoveNext())
             {
-                int y = (size - index - 1) * 33;
+                int y = index * 33;
                 if (y > position.height)
                 {
                     index++;
@@ -73,6 +95,12 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
                 rect = new Rect(0, y, position.width, 32);
                 if (GUI.Button(rect, e.Current.guiContent, available? styleAvailable : styleUnavailable))
                 {
+                    if (Event.current.button == (int) MouseButton.RightMouse)
+                    {
+                        markedObjects.Remove(e.Current);
+                        repaint = true;
+                        break;
+                    }
                     if (available)
                     {
                         Selection.SetActiveObjectWithContext(e.Current.obj, null);
@@ -83,11 +111,39 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
                 index++;
             }
         }
+
+        if (repaint)
+        {
+            UpdateCount();
+            Repaint();
+        }
+    }
+
+    public bool AddItem (UnityEngine.Object obj, bool delayRepaint = false)
+    {
+        if (markedObjects.Count >= SIZE)
+        {
+            ShowNotification(full);
+            return false;
+        }
+        Item item = GetItemFromPool();
+        item.obj = obj;
+        item.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(obj, null));
+        this.markedObjects.Add(item);
+        UpdateCount();
+        if (!delayRepaint)
+            Repaint();
+        return true;
+    }
+
+    void UpdateCount ()
+    {
+        this.titleContent.text = string.Concat("Laters ", markedObjects.Count, "/", SIZE);
     }
 
     void Initialize()
     {
-        if (recentObjects == null) recentObjects = new Queue<Item>();
+        if (markedObjects == null) markedObjects = new HashSet<Item>();
         pool = new Stack<Item>(SIZE);
         initialized = true;
     }
@@ -100,20 +156,6 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
 
     UnityEngine.Object selectingWithin;
 
-    void OnSelectionChange()
-    {
-        if (UnityEditor.Selection.activeObject == null) return;
-
-        UnityEngine.Object last = UnityEditor.Selection.objects[Selection.objects.Length - 1];
-        if (last == selectingWithin) return;
-
-        Item i = GetItemFromPool();
-        i.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(last, null));
-        i.obj = last;
-        recentObjects.Enqueue(i);
-        if (recentObjects.Count >= SIZE) pool.Push(recentObjects.Dequeue());
-        Repaint();
-    }
     public void OnBeforeSerialize()
     {
         if (cache == null) cache = new Item[SIZE];
@@ -122,7 +164,7 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
             for (int i = 0; i < cache.Length; i++) cache[i] = null;
         }
         int index = 0;
-        using (var e = recentObjects.GetEnumerator())
+        using (var e = markedObjects.GetEnumerator())
         {
             while (e.MoveNext())
             {
@@ -134,16 +176,17 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
 
     public void OnAfterDeserialize()
     {
-        if (recentObjects == null) recentObjects = new Queue<Item>(SIZE);
-        else recentObjects.Clear();
+        if (markedObjects == null) markedObjects = new HashSet<Item>();
+        else markedObjects.Clear();
 
         if (cache == null) return;
 
         for (int i = 0; i < cache.Length; i++)
         {
             if (cache[i] == null || cache[i].obj == null) continue;
-            recentObjects.Enqueue(cache[i]);
+            markedObjects.Add(cache[i]);
         }
+        UpdateCount();
     }
 
     [Serializable]
