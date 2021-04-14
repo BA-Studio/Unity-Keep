@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text;
+using Google;
 using UnityEditor;
 using UnityEngine;
 
 public class Recents : EditorWindow, ISerializationCallbackReceiver
 {
+    public static Recents Instance { get; private set; }
     static readonly int SIZE = 30;
     bool initialized;
     [SerializeField] Item[] cache;
@@ -14,7 +17,12 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
     [MenuItem("Window/BAStudio/Recents")]
     public static void ShowWindow()
     {
-        EditorWindow.GetWindow(typeof(Recents));
+        if (Instance != null)
+        {
+            Instance.ShowNotification(new GUIContent("I'm here!"));
+            return;
+        }
+        Instance = EditorWindow.GetWindow<Recents>();
     }
 
     GUIStyle styleAvailable, styleUnavailable;
@@ -22,6 +30,7 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
 
     void OnEnable ()
     {
+        if (Instance == null) Instance = this;
         initialized = false;
     }
 
@@ -46,7 +55,6 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
         EditorGUIUtility.SetIconSize(new Vector2(24f, 24f));
         if (recentObjects.Count == 0) return;
 
-        Rect rect;
         int size, index;
         size = recentObjects.Count;
         index = 0;
@@ -62,13 +70,15 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
                     continue;
                 }
 
+                Rect r = GUILayoutUtility.GetRect(position.width, 32);
+                GUILayout.Space(1);
+
                 bool available = true;
                 if (e.Current.obj == null) available = false;
                 if (e.Current.guiContent == null)
-                    e.Current.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(UnityEditor.Selection.activeObject, null));
+                    e.Current.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(e.Current.obj, null));
 
-                rect = new Rect(0, y, position.width, 32);
-                if (GUI.Button(rect, e.Current.guiContent, available? styleAvailable : styleUnavailable))
+                if (GUI.Button(r, e.Current.guiContent, available? styleAvailable : styleUnavailable))
                 {
                     
                     if (available)
@@ -76,7 +86,13 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
                         
                         if (Event.current.button == 1) // Right mouse button
                         {
-                            EditorWindow.GetWindow<Laters>().AddItem(e.Current.obj);
+                            if (Laters.Instance != null) Laters.Instance.AddItem(e.Current.obj);
+                            else if (Forevers.Instance != null) Forevers.Instance.AddItem(e.Current.obj);
+                            else
+                            {
+                                Laters.ShowWindow();
+                                Laters.Instance.AddItem(e.Current.obj);
+                            }
                         }
                         else
                         {
@@ -89,6 +105,7 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
                 index++;
             }
         }
+
     }
 
     void Initialize()

@@ -1,19 +1,23 @@
 ﻿using System;
 using System.Collections.Generic;
-using UnityEditor;
+using System.Diagnostics;
 using UnityEngine;
+using UnityEditor;
 using UnityEngine.Experimental.UIElements;
+using System.Text;
 
-public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMenu
+public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustomMenu
 {
-    public static Laters Instance { get; private set; }
+    public static Forevers Instance { get; private set; }
     static readonly int SIZE = 30, ITEM_SIZE = 32, PADDING = 1, ITEM_PADDED = 33;
     bool initialized;
     [SerializeField] Item[] cache;
-    Queue<Item> markedObjects;
+    HashSet<Item> markedObjects;
+    HashSet<UnityEngine.Object> markedUnityOnjects;
+    HashSet<Item> deferredRemoving;
     Stack<Item> pool;
 
-    [MenuItem("Window/BAStudio/Laters")]
+    [MenuItem("Window/BAStudio/Forevers")]
     public static void ShowWindow()
     {
         if (Instance != null)
@@ -21,7 +25,7 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
             Instance.ShowNotification(new GUIContent("I'm here!"));
             return;
         }
-        Instance = EditorWindow.GetWindow<Laters>();
+        Instance = EditorWindow.GetWindow<Forevers>();
     }
 
     GUIStyle styleAvailable, styleUnavailable;
@@ -33,6 +37,45 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
     {
         if (Instance == null) Instance = this;
         initialized = false;
+    }
+
+    void OnDisable ()
+    {
+    }
+
+    void Awake ()
+    {
+        string[] stored = PlayerPrefs.GetString("Editor.BAStudio.Forevers").Split(';');
+        foreach (string s in stored)
+        {
+            if (string.IsNullOrEmpty(s)) continue;
+            UnityEngine.Object o = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(s);
+            AddItem(o, true);
+        }
+        Repaint();
+    }
+
+    void OnDestroy ()
+    {
+        OnBeforeSerialize();
+        Save();
+    }
+
+    void Save ()
+    {
+        if (cache == null) return;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < cache.Length; i++)
+        {
+            if (cache[i] == null) continue;
+            if (AssetDatabase.Contains(cache[i].obj))
+            {
+                sb.Append(AssetDatabase.GetAssetPath(cache[i].obj));
+                sb.Append(";");
+            }
+        }
+        UnityEngine.Debug.Log(sb.ToString());
+        PlayerPrefs.SetString("Editor.BAStudio.Forevers", sb.ToString());
     }
 
     [SerializeField] Vector2 scroll;
@@ -77,6 +120,18 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
             return;
         }
 
+
+        if (Event.current.type == EventType.Layout)
+        {
+            if (deferredRemoving.Count > 0)
+            {
+                using (var e = deferredRemoving.GetEnumerator())
+                while (e.MoveNext())
+                    RemoveItem(e.Current);
+            }
+            deferredRemoving.Clear();
+        }
+
         EditorGUIUtility.SetIconSize(new Vector2(24f, 24f));
         if (markedObjects.Count == 0) return;
 
@@ -119,27 +174,20 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
                     {
                         if (Event.current.button == (int) MouseButton.RightMouse)
                         {
-                            if (available)
-                            {
-                                if (Forevers.Instance == null)
-                                    Forevers.ShowWindow();
-                                Forevers.Instance.AddItem(e.Current.obj);
-                            }
-                            else ShowNotification(outOfScope);
+                            deferredRemoving.Add(e.Current);
+                            repaint = true;
+                            break;
                         }
-                        else
+                        if (available)
                         {
-                            if (available)
-                            {
-                                Selection.SetActiveObjectWithContext(e.Current.obj, null);
-                                selectingWithin = e.Current.obj;
-                            }
-                            else ShowNotification(outOfScope);
+                            Selection.SetActiveObjectWithContext(e.Current.obj, null);
+                            selectingWithin = e.Current.obj;
                         }
+                        else ShowNotification(outOfScope);
                     }
                 }
             }
-
+            
             GUILayoutUtility.GetRect(position.width, (markedObjects.Count - 1 - lastVisibleIndex) * ITEM_PADDED);
         }
 
@@ -152,21 +200,31 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
 
     public bool AddItem (UnityEngine.Object obj, bool delayRepaint = false)
     {
+        Initialize();
+        if (markedObjects.Count >= SIZE)
+        {
+            ShowNotification(full);
+            return false;
+        }
+        if (!markedUnityOnjects.Add(obj)) return false;
         Item item = GetItemFromPool();
         item.obj = obj;
-        item.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(obj, null));
-        this.markedObjects.Enqueue(item);
-        Item i = GetItemFromPool();
-        if (markedObjects.Count >= SIZE) pool.Push(markedObjects.Dequeue());
+        this.markedObjects.Add(item);
         UpdateCount();
         if (!delayRepaint)
             Repaint();
         return true;
     }
 
+    void RemoveItem (Item i)
+    {
+        markedUnityOnjects.Remove(i.obj);
+        markedObjects.Remove(i);
+    }
+
     void UpdateCount ()
     {
-        this.titleContent.text = string.Concat("Laters ", markedObjects.Count, "/", SIZE);
+        this.titleContent.text = string.Concat("Forevers ", markedObjects.Count, "/", SIZE);
     }
 
     public void AddItemsToMenu(GenericMenu menu)
@@ -182,8 +240,10 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
 
     void Initialize()
     {
-        if (markedObjects == null) markedObjects = new Queue<Item>();
-        pool = new Stack<Item>(SIZE);
+        if (markedObjects == null) markedObjects = new HashSet<Item>();
+        if (markedUnityOnjects == null) markedUnityOnjects = new HashSet<UnityEngine.Object>();
+        if (deferredRemoving == null) deferredRemoving = new HashSet<Item>();
+        if (pool == null) pool = new Stack<Item>(SIZE);
         initialized = true;
     }
 
@@ -215,7 +275,8 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
 
     public void OnAfterDeserialize()
     {
-        if (markedObjects == null) markedObjects = new Queue<Item>();
+        if (markedObjects == null) markedObjects = new HashSet<Item>();
+        if (markedUnityOnjects == null) markedUnityOnjects = new HashSet<UnityEngine.Object>();
         else markedObjects.Clear();
 
         if (cache == null) return;
@@ -223,7 +284,7 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
         for (int i = 0; i < cache.Length; i++)
         {
             if (cache[i] == null || cache[i].obj == null) continue;
-            markedObjects.Enqueue(cache[i]);
+            AddItem(cache[i].obj);
         }
         UpdateCount();
     }

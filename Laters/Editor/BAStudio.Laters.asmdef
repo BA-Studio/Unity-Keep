@@ -1,6 +1,8 @@
 {
     "name": "BAStudio.Laters",
-    "references": [],
+    "references": [
+        "BAStudio.Forevers"
+    ],
     "optionalUnityReferences": [],
     "includePlatforms": [
         "Editor"
