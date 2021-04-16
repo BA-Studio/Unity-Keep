@@ -28,7 +28,7 @@ public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustom
         Instance = EditorWindow.GetWindow<Forevers>();
     }
 
-    GUIStyle styleAvailable, styleUnavailable;
+    GUIStyle styleAvailable, styleUnavailable, styleHint;
     GUIContent outOfScope = new GUIContent("Selected object\nis out of scope!");
     GUIContent full = new GUIContent("Storage full!\nClear the list for\nbest productivity👊");
     bool latersEnabled;
@@ -74,7 +74,7 @@ public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustom
                 sb.Append(";");
             }
         }
-        UnityEngine.Debug.Log(sb.ToString());
+        // UnityEngine.Debug.Log(sb.ToString());
         PlayerPrefs.SetString("Editor.BAStudio.Forevers", sb.ToString());
     }
 
@@ -97,6 +97,13 @@ public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustom
             styleUnavailable.normal.textColor = Color.grey;
             styleUnavailable.alignment = TextAnchor.MiddleLeft;
             styleUnavailable.fontSize = 12;
+        }
+        if (styleHint == null)
+        {
+            styleHint = new GUIStyle(GUI.skin.label);
+            styleHint.normal.textColor = Color.grey;
+            styleHint.alignment = TextAnchor.MiddleCenter;
+            styleHint.fontSize = 12;
         }
 
         bool repaint = false;
@@ -201,6 +208,11 @@ public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustom
             }
             
             if (lastVisibleIndex < items.Count - 1) GUILayoutUtility.GetRect(position.width, (items.Count - 1 - lastVisibleIndex) * ITEM_PADDED);
+        }
+
+        if (items.Count * ITEM_PADDED < position.height/3)
+        {
+            GUI.Label(new Rect(0, 0, position.width, position.height), "Left click to select\nRight click to remove", styleHint);
         }
 
         if (repaint)

@@ -8,10 +8,10 @@ using UnityEngine;
 public class Recents : EditorWindow, ISerializationCallbackReceiver
 {
     public static Recents Instance { get; private set; }
-    static readonly int SIZE = 30;
+    static readonly int SIZE = 30, ITEM_SIZE = 32, PADDING = 1, ITEM_PADDED = 33;
     bool initialized;
     [SerializeField] Item[] cache;
-    Queue<Item> recentObjects;
+    Queue<Item> items;
     Stack<Item> pool;
 
     [MenuItem("Window/BAStudio/Recents")]
@@ -25,7 +25,7 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
         Instance = EditorWindow.GetWindow<Recents>();
     }
 
-    GUIStyle styleAvailable, styleUnavailable;
+    GUIStyle styleAvailable, styleUnavailable, styleHint;
     GUIContent outOfScope = new GUIContent("Selected object\nis out of scope!");
 
     void OnEnable ()
@@ -51,30 +51,44 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
             styleUnavailable.alignment = TextAnchor.MiddleLeft;
             styleUnavailable.fontSize = 12;
         }
+        if (styleHint == null)
+        {
+            styleHint = new GUIStyle(GUI.skin.label);
+            styleHint.normal.textColor = Color.grey;
+            styleHint.alignment = TextAnchor.MiddleCenter;
+            styleHint.fontSize = 12;
+        }
 
         EditorGUIUtility.SetIconSize(new Vector2(24f, 24f));
-        if (recentObjects.Count == 0) return;
+
+        if (items.Count * ITEM_PADDED < position.height/3)
+        {
+            if (Forevers.Instance != null)
+                GUI.Label(new Rect(0, 0, position.width, position.height), "Left click to select\nRight click to Forevers", styleHint);
+            else GUI.Label(new Rect(0, 0, position.width, position.height), "Left click to select\nRight click to Laters", styleHint);
+        }
+
+        if (items.Count == 0) return;
 
         int size, index;
-        size = recentObjects.Count;
+        size = items.Count;
         index = -1;
 
-        using (var e = recentObjects.GetEnumerator())
+        using (var e = items.GetEnumerator())
         {
             while (e.MoveNext())
             {
                 index++;
-                int y = (size - index - 1) * 33;
+                int y = (size - index - 1) * ITEM_PADDED;
                 if (y > position.height)
                 {
                     continue;
                 }
 
-                Rect r = new Rect(0, y, position.width, 32);
+                Rect r = new Rect(0, y, position.width, ITEM_SIZE);
                 DrawItem(e.Current, r);
             }
         }
-
     }
 
     void DrawItem (Item i, Rect r)
@@ -112,7 +126,7 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
 
     void Initialize()
     {
-        if (recentObjects == null) recentObjects = new Queue<Item>();
+        if (items == null) items = new Queue<Item>();
         pool = new Stack<Item>(SIZE);
         initialized = true;
     }
@@ -135,8 +149,8 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
         Item i = GetItemFromPool();
         i.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(last, null));
         i.obj = last;
-        recentObjects.Enqueue(i);
-        if (recentObjects.Count >= SIZE) pool.Push(recentObjects.Dequeue());
+        items.Enqueue(i);
+        if (items.Count >= SIZE) pool.Push(items.Dequeue());
         Repaint();
     }
     public void OnBeforeSerialize()
@@ -147,7 +161,7 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
             for (int i = 0; i < cache.Length; i++) cache[i] = null;
         }
         int index = 0;
-        using (var e = recentObjects.GetEnumerator())
+        using (var e = items.GetEnumerator())
         {
             while (e.MoveNext())
             {
@@ -159,15 +173,15 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
 
     public void OnAfterDeserialize()
     {
-        if (recentObjects == null) recentObjects = new Queue<Item>(SIZE);
-        else recentObjects.Clear();
+        if (items == null) items = new Queue<Item>(SIZE);
+        else items.Clear();
 
         if (cache == null) return;
 
         for (int i = 0; i < cache.Length; i++)
         {
             if (cache[i] == null || cache[i].obj == null) continue;
-            recentObjects.Enqueue(cache[i]);
+            items.Enqueue(cache[i]);
         }
     }
 

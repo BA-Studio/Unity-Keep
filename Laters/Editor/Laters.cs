@@ -25,7 +25,7 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
         Instance = EditorWindow.GetWindow<Laters>();
     }
 
-    GUIStyle styleAvailable, styleUnavailable, styleHighlight;
+    GUIStyle styleAvailable, styleUnavailable, styleHint;
     GUIContent outOfScope = new GUIContent("Selected object\nis out of scope!");
     GUIContent full = new GUIContent("Storage full!\nClear the list for\nbest productivity👊");
 
@@ -56,13 +56,12 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
             styleUnavailable.alignment = TextAnchor.MiddleLeft;
             styleUnavailable.fontSize = 12;
         }
-        if (styleHighlight == null)
+        if (styleHint == null)
         {
-            styleHighlight = new GUIStyle(GUI.skin.button);
-            styleHighlight.normal.textColor = Color.yellow;
-            styleHighlight.alignment = TextAnchor.MiddleLeft;
-            styleHighlight.fontSize = 16;
-            styleHighlight.fontStyle = FontStyle.Bold;
+            styleHint = new GUIStyle(GUI.skin.label);
+            styleHint.normal.textColor = Color.grey;
+            styleHint.alignment = TextAnchor.MiddleCenter;
+            styleHint.fontSize = 12;
         }
 
         bool repaint = false;
@@ -91,7 +90,6 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
             }
             case EventType.Layout:
             {
-                inPanelPing = null;
                 break;
             }
         }
@@ -147,6 +145,11 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
             if (lowerCulled > 0) GUILayoutUtility.GetRect(position.width, lowerCulled * ITEM_PADDED);
         }
 
+        if (items.Count * ITEM_PADDED < position.height/3)
+        {
+            GUI.Label(new Rect(0, 0, position.width, position.height), "Left click to select\nRight click to Forevers", styleHint);
+        }
+
         if (repaint)
         {
             UpdateCount();
@@ -161,7 +164,7 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
         if (i.guiContent == null)
             i.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(i.obj, null));
 
-        if (GUI.Button(r, i.guiContent, available? inPanelPing == i.obj? styleHighlight : styleAvailable : styleUnavailable))
+        if (GUI.Button(r, i.guiContent, available? styleAvailable : styleUnavailable))
         {
             if (Event.current.button == (int) MouseButton.RightMouse)
             {
@@ -185,14 +188,11 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
         }
     }
 
-    UnityEngine.Object inPanelPing;
-
     public bool AddItem (UnityEngine.Object obj, bool delayRepaint = false)
     {
         Initialize();
         if (!unityObjects.Add(obj))
         {
-            inPanelPing = obj;
             Repaint();
             return false;
         }
