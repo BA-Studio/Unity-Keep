@@ -1,8 +1,6 @@
 {
-    "name": "BAStudio.Recents",
+    "name": "BAStudio.Keep",
     "references": [
-        "BAStudio.Laters",
-        "BAStudio.Forevers"
     ],
     "optionalUnityReferences": [],
     "includePlatforms": [
