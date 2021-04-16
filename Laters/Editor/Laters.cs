@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Experimental.UIElements;
@@ -11,6 +12,7 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
     bool initialized;
     [SerializeField] Item[] cache;
     Queue<Item> items;
+    List<Item> itemsReversed;
     HashSet<UnityEngine.Object> unityObjects;
     Stack<Item> pool;
 
@@ -100,7 +102,7 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
 
         if (items.Count * ITEM_PADDED < position.height/3)
         {
-            GUI.Label(new Rect(0, 0, position.width, position.height), "Left click to select\nRight click to Forevers", styleHint);
+            GUI.Label(new Rect(0, 0, position.width, position.height), "Left click to select\nRight click to Forevers\nLatest on top", styleHint);
         }
         if (items.Count == 0) return;
 
@@ -131,7 +133,12 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
 
             if (upperCulled > 0) GUILayoutUtility.GetRect(position.width, upperCulled * ITEM_PADDED);
 
-            using (var e = items.GetEnumerator())
+            // if (itemsReversed.Count != items.Count)
+            // {
+            //     itemsReversed.Clear();
+            //     itemsReversed.AddRange(items.Reverse());
+            // }
+            using (var e = itemsReversed.GetEnumerator())
             {
                 while (e.MoveNext())
                 {
@@ -194,19 +201,20 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
         Initialize();
         if (!unityObjects.Add(obj))
         {
-            Repaint();
             return false;
         }
         Item item = GetItemFromPool();
         item.obj = obj;
         item.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(obj, null));
         this.items.Enqueue(item);
+        this.itemsReversed.Insert(0, item);
         Item i = GetItemFromPool();
         if (items.Count >= SIZE)
         {
             var d = items.Dequeue();
             unityObjects.Remove(d.obj);
             pool.Push(d);
+            itemsReversed.Remove(d);
         }
         UpdateCount();
         if (!delayRepaint)
@@ -234,6 +242,7 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
     void Initialize()
     {
         if (items == null) items = new Queue<Item>();
+        if (itemsReversed == null) itemsReversed = new List<Item>();
         if (unityObjects == null) unityObjects = new HashSet<UnityEngine.Object>();
         if (pool == null) pool = new Stack<Item>(SIZE);
         initialized = true;
@@ -268,18 +277,16 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
 
     public void OnAfterDeserialize()
     {
-        if (items == null) items = new Queue<Item>();
-        else items.Clear();
-        if (unityObjects == null) unityObjects = new HashSet<UnityEngine.Object>();
-        else unityObjects.Clear();
-
+        Initialize();
         if (cache == null) return;
 
         for (int i = 0; i < cache.Length; i++)
         {
             if (cache[i] == null || cache[i].obj == null) continue;
+            
+            if (!unityObjects.Add(cache[i].obj)) continue;
             items.Enqueue(cache[i]);
-            unityObjects.Add(cache[i].obj);
+            itemsReversed.Insert(0, cache[i]);
         }
         UpdateCount();
     }

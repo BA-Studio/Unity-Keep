@@ -64,8 +64,8 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
         if (items.Count * ITEM_PADDED < position.height/3)
         {
             if (Forevers.Instance != null)
-                GUI.Label(new Rect(0, 0, position.width, position.height), "Left click to select\nRight click to Forevers", styleHint);
-            else GUI.Label(new Rect(0, 0, position.width, position.height), "Left click to select\nRight click to Laters", styleHint);
+                GUI.Label(new Rect(0, 0, position.width, position.height), "Left click to select\nRight click to Forevers\nLatest on top", styleHint);
+            else GUI.Label(new Rect(0, 0, position.width, position.height), "Left click to select\nRight click to Laters\nLatest on top", styleHint);
         }
 
         if (items.Count == 0) return;
