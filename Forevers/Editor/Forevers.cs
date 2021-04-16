@@ -12,8 +12,8 @@ public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustom
     static readonly int SIZE = 30, ITEM_SIZE = 32, PADDING = 1, ITEM_PADDED = 33;
     bool initialized;
     [SerializeField] Item[] cache;
-    HashSet<Item> markedObjects;
-    HashSet<UnityEngine.Object> markedUnityOnjects;
+    HashSet<Item> items;
+    HashSet<UnityEngine.Object> unityObjects;
     HashSet<Item> deferredRemoving;
     Stack<Item> pool;
 
@@ -79,6 +79,7 @@ public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustom
     }
 
     [SerializeField] Vector2 scroll;
+    int firstVisibleIndex, lastVisibleIndex;
 
     void OnGUI ()
     {
@@ -100,43 +101,48 @@ public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustom
 
         bool repaint = false;
 
-		if (Event.current.type == EventType.DragUpdated)
-		{
-			DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
-			Event.current.Use();
-		}
-        else if (Event.current.type == EventType.DragPerform)
+        switch (Event.current.type)
         {
-            for (int i = 0; i < DragAndDrop.objectReferences.Length; i++)
+            case EventType.DragUpdated:
             {
-                if (!AddItem(DragAndDrop.objectReferences[i], true)) break;
+                DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+                Event.current.Use();
+                break;
             }
-
-            DragAndDrop.AcceptDrag();
-            Event.current.Use();
-
-            repaint = true;
-            // Repaint();
-            return;
-        }
-
-
-        if (Event.current.type == EventType.Layout)
-        {
-            if (deferredRemoving.Count > 0)
+            case EventType.DragPerform:
             {
-                using (var e = deferredRemoving.GetEnumerator())
-                while (e.MoveNext())
-                    RemoveItem(e.Current);
-            }
-            deferredRemoving.Clear();
-        }
+                for (int i = 0; i < DragAndDrop.objectReferences.Length; i++)
+                {
+                    if (!AddItem(DragAndDrop.objectReferences[i], true)) break;
+                }
 
+                DragAndDrop.AcceptDrag();
+                Event.current.Use();
+
+                repaint = true;
+                // Repaint();
+                return;
+            }
+            case EventType.Layout:
+            {
+                if (deferredRemoving.Count > 0)
+                {
+                    using (var e = deferredRemoving.GetEnumerator())
+                    while (e.MoveNext())
+                        RemoveItem(e.Current);
+                    
+                    repaint = true;
+                    deferredRemoving.Clear();
+                }
+                break;
+            }
+        }
+        
         EditorGUIUtility.SetIconSize(new Vector2(24f, 24f));
-        if (markedObjects.Count == 0) return;
+        if (items.Count == 0) return;
 
         int size, index;
-        size = markedObjects.Count;
+        size = items.Count;
         index = -1;
 
         using (var scrollView = new EditorGUILayout.ScrollViewScope(scroll, GUIStyle.none, GUI.skin.verticalScrollbar))
@@ -145,18 +151,23 @@ public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustom
 
             // Optimization: Draw only visible control and compress all invisible control to 2 rects (upper/lower)
             // Calculate upper/lower palceholder height
+            if (Event.current.type == EventType.Layout)
+            {
             float upperBound = scroll.y;
             float lowerBound = scroll.y + position.height;
-            int firstVisibleIndex = (int) Mathf.Floor((upperBound - ITEM_SIZE) / (float) ITEM_PADDED) + 1;
-            int lastVisibleIndex = (int) Mathf.Ceil(lowerBound / (float) ITEM_PADDED);
+            firstVisibleIndex = (int) Mathf.Floor((upperBound - ITEM_SIZE) / (float) ITEM_PADDED) + 1;
+            if (upperBound < ITEM_SIZE) firstVisibleIndex = 0; // The above calculation does not guarantee first item. Override
+            lastVisibleIndex = (int) Mathf.Ceil(lowerBound / (float) ITEM_PADDED);
+            }
 
-            GUILayoutUtility.GetRect(position.width, (firstVisibleIndex - 1) * ITEM_PADDED);
+            if (firstVisibleIndex > 0) GUILayoutUtility.GetRect(position.width, firstVisibleIndex * ITEM_PADDED);
 
-            using (var e = markedObjects.GetEnumerator())
+            using (var e = items.GetEnumerator())
             {
                 while (e.MoveNext())
                 {
                     index++;
+                    // UnityEngine.Debug.LogFormat("Index: {0}, {1}~{2}, Scroll:{3} / {4} -> {5}", index, firstVisibleIndex, lastVisibleIndex, scroll.y, position.height, e.Current.obj.name);
                     if (index < firstVisibleIndex || index > lastVisibleIndex)
                     {
                         continue;
@@ -188,7 +199,7 @@ public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustom
                 }
             }
             
-            GUILayoutUtility.GetRect(position.width, (markedObjects.Count - 1 - lastVisibleIndex) * ITEM_PADDED);
+            if (lastVisibleIndex < items.Count - 1) GUILayoutUtility.GetRect(position.width, (items.Count - 1 - lastVisibleIndex) * ITEM_PADDED);
         }
 
         if (repaint)
@@ -201,15 +212,15 @@ public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustom
     public bool AddItem (UnityEngine.Object obj, bool delayRepaint = false)
     {
         Initialize();
-        if (markedObjects.Count >= SIZE)
+        if (items.Count >= SIZE)
         {
             ShowNotification(full);
             return false;
         }
-        if (!markedUnityOnjects.Add(obj)) return false;
+        if (!unityObjects.Add(obj)) return false;
         Item item = GetItemFromPool();
         item.obj = obj;
-        this.markedObjects.Add(item);
+        this.items.Add(item);
         UpdateCount();
         if (!delayRepaint)
             Repaint();
@@ -218,13 +229,13 @@ public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustom
 
     void RemoveItem (Item i)
     {
-        markedUnityOnjects.Remove(i.obj);
-        markedObjects.Remove(i);
+        unityObjects.Remove(i.obj);
+        items.Remove(i);
     }
 
     void UpdateCount ()
     {
-        this.titleContent.text = string.Concat("Forevers ", markedObjects.Count, "/", SIZE);
+        this.titleContent.text = string.Concat("Forevers ", items.Count, "/", SIZE);
     }
 
     public void AddItemsToMenu(GenericMenu menu)
@@ -234,14 +245,15 @@ public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustom
 
     public void Clear ()
     {
-        markedObjects.Clear();
+        items.Clear();
+        unityObjects.Clear();
         UpdateCount();
     }
 
     void Initialize()
     {
-        if (markedObjects == null) markedObjects = new HashSet<Item>();
-        if (markedUnityOnjects == null) markedUnityOnjects = new HashSet<UnityEngine.Object>();
+        if (items == null) items = new HashSet<Item>();
+        if (unityObjects == null) unityObjects = new HashSet<UnityEngine.Object>();
         if (deferredRemoving == null) deferredRemoving = new HashSet<Item>();
         if (pool == null) pool = new Stack<Item>(SIZE);
         initialized = true;
@@ -249,8 +261,9 @@ public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustom
 
     Item GetItemFromPool ()
     {
-        if (pool.Count > 0) return pool.Pop();
-        else return new Item();
+        Item i = (pool.Count > 0)? pool.Pop() : new Item();
+        i.guiContent = null;
+        return i;
     }
 
     UnityEngine.Object selectingWithin;
@@ -263,7 +276,7 @@ public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustom
             for (int i = 0; i < cache.Length; i++) cache[i] = null;
         }
         int index = 0;
-        using (var e = markedObjects.GetEnumerator())
+        using (var e = items.GetEnumerator())
         {
             while (e.MoveNext())
             {
@@ -275,9 +288,9 @@ public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustom
 
     public void OnAfterDeserialize()
     {
-        if (markedObjects == null) markedObjects = new HashSet<Item>();
-        if (markedUnityOnjects == null) markedUnityOnjects = new HashSet<UnityEngine.Object>();
-        else markedObjects.Clear();
+        if (items == null) items = new HashSet<Item>();
+        if (unityObjects == null) unityObjects = new HashSet<UnityEngine.Object>();
+        else items.Clear();
 
         if (cache == null) return;
 

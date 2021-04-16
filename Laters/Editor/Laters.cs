@@ -10,7 +10,8 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
     static readonly int SIZE = 30, ITEM_SIZE = 32, PADDING = 1, ITEM_PADDED = 33;
     bool initialized;
     [SerializeField] Item[] cache;
-    Queue<Item> markedObjects;
+    Queue<Item> items;
+    HashSet<UnityEngine.Object> unityObjects;
     Stack<Item> pool;
 
     [MenuItem("Window/BAStudio/Laters")]
@@ -24,10 +25,9 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
         Instance = EditorWindow.GetWindow<Laters>();
     }
 
-    GUIStyle styleAvailable, styleUnavailable;
+    GUIStyle styleAvailable, styleUnavailable, styleHighlight;
     GUIContent outOfScope = new GUIContent("Selected object\nis out of scope!");
     GUIContent full = new GUIContent("Storage full!\nClear the list for\nbest productivity👊");
-    bool latersEnabled;
 
     void OnEnable ()
     {
@@ -36,6 +36,8 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
     }
 
     [SerializeField] Vector2 scroll;
+    
+    int upperCulled, midDrawn, lowerCulled;
 
     void OnGUI ()
     {
@@ -54,34 +56,52 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
             styleUnavailable.alignment = TextAnchor.MiddleLeft;
             styleUnavailable.fontSize = 12;
         }
+        if (styleHighlight == null)
+        {
+            styleHighlight = new GUIStyle(GUI.skin.button);
+            styleHighlight.normal.textColor = Color.yellow;
+            styleHighlight.alignment = TextAnchor.MiddleLeft;
+            styleHighlight.fontSize = 16;
+            styleHighlight.fontStyle = FontStyle.Bold;
+        }
 
         bool repaint = false;
 
-		if (Event.current.type == EventType.DragUpdated)
-		{
-			DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
-			Event.current.Use();
-		}
-        else if (Event.current.type == EventType.DragPerform)
+        switch (Event.current.type)
         {
-            for (int i = 0; i < DragAndDrop.objectReferences.Length; i++)
+            case EventType.DragUpdated:
             {
-                if (!AddItem(DragAndDrop.objectReferences[i], true)) break;
+                DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+                Event.current.Use();
+                break;
             }
+            case EventType.DragPerform:
+            {
+                for (int i = 0; i < DragAndDrop.objectReferences.Length; i++)
+                {
+                    if (!AddItem(DragAndDrop.objectReferences[i], true)) break;
+                }
 
-            DragAndDrop.AcceptDrag();
-            Event.current.Use();
+                DragAndDrop.AcceptDrag();
+                Event.current.Use();
 
-            repaint = true;
-            // Repaint();
-            return;
+                repaint = true;
+                // Repaint();
+                return;
+            }
+            case EventType.Layout:
+            {
+                inPanelPing = null;
+                break;
+            }
         }
+        
 
         EditorGUIUtility.SetIconSize(new Vector2(24f, 24f));
-        if (markedObjects.Count == 0) return;
+        if (items.Count == 0) return;
 
         int size, index;
-        size = markedObjects.Count;
+        size = items.Count;
         index = -1;
 
         using (var scrollView = new EditorGUILayout.ScrollViewScope(scroll, GUIStyle.none, GUI.skin.verticalScrollbar))
@@ -90,57 +110,41 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
 
             // Optimization: Draw only visible control and compress all invisible control to 2 rects (upper/lower)
             // Calculate upper/lower palceholder height
-            float upperBound = scroll.y;
-            float lowerBound = scroll.y + position.height;
-            int firstVisibleIndex = (int) Mathf.Floor((upperBound - ITEM_SIZE) / (float) ITEM_PADDED) + 1;
-            int lastVisibleIndex = (int) Mathf.Ceil(lowerBound / (float) ITEM_PADDED);
+            
+            int itemCount = items.Count;
 
-            GUILayoutUtility.GetRect(position.width, (firstVisibleIndex - 1) * ITEM_PADDED);
+            // int maxDrawable = (int) Mathf.Ceil(position.height / (float) ITEM_PADDED);
+            if (Event.current.type == EventType.Layout)
+            {
+                upperCulled = (int) Mathf.Floor(scroll.y / (float) ITEM_PADDED);
+                lowerCulled = (int) Mathf.Floor((items.Count * ITEM_PADDED - scroll.y - position.height) / (float) ITEM_PADDED);
+                midDrawn = items.Count - upperCulled - lowerCulled;
+            }
 
-            using (var e = markedObjects.GetEnumerator())
+            // int firstVisibleIndex = (int) Mathf.Floor((upperBound - ITEM_SIZE) / (float) ITEM_PADDED) + 1;
+            // if (scroll.y < ITEM_SIZE) firstVisibleIndex = 0; // The above calculation does not guarantee first item. Override
+            // int lastVisibleIndex = (int) Mathf.Ceil(lowerBound / (float) ITEM_PADDED);
+
+            if (upperCulled > 0) GUILayoutUtility.GetRect(position.width, upperCulled * ITEM_PADDED);
+
+            using (var e = items.GetEnumerator())
             {
                 while (e.MoveNext())
                 {
                     index++;
-                    if (index < firstVisibleIndex || index > lastVisibleIndex)
+                    // UnityEngine.Debug.LogFormat("Index: {0}, {1}~{2}, Scroll:{3} / {4}", index, firstVisibleIndex, lastVisibleIndex, scroll.y, position.height);
+                    if (index < upperCulled || index >= itemCount - lowerCulled)
                     {
                         continue;
                     }
 
                     Rect r = GUILayoutUtility.GetRect(position.width, ITEM_SIZE);
                     GUILayout.Space(1);
-
-                    bool available = true;
-                    if (e.Current.obj == null) available = false;
-                    if (e.Current.guiContent == null)
-                        e.Current.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(e.Current.obj, null));
-
-                    if (GUI.Button(r, e.Current.guiContent, available? styleAvailable : styleUnavailable))
-                    {
-                        if (Event.current.button == (int) MouseButton.RightMouse)
-                        {
-                            if (available)
-                            {
-                                if (Forevers.Instance == null)
-                                    Forevers.ShowWindow();
-                                Forevers.Instance.AddItem(e.Current.obj);
-                            }
-                            else ShowNotification(outOfScope);
-                        }
-                        else
-                        {
-                            if (available)
-                            {
-                                Selection.SetActiveObjectWithContext(e.Current.obj, null);
-                                selectingWithin = e.Current.obj;
-                            }
-                            else ShowNotification(outOfScope);
-                        }
-                    }
+                    DrawItem(e.Current, r);
                 }
             }
 
-            GUILayoutUtility.GetRect(position.width, (markedObjects.Count - 1 - lastVisibleIndex) * ITEM_PADDED);
+            if (lowerCulled > 0) GUILayoutUtility.GetRect(position.width, lowerCulled * ITEM_PADDED);
         }
 
         if (repaint)
@@ -150,14 +154,59 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
         }
     }
 
+    void DrawItem (Item i, Rect r)
+    {
+        bool available = true;
+        if (i.obj == null) available = false;
+        if (i.guiContent == null)
+            i.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(i.obj, null));
+
+        if (GUI.Button(r, i.guiContent, available? inPanelPing == i.obj? styleHighlight : styleAvailable : styleUnavailable))
+        {
+            if (Event.current.button == (int) MouseButton.RightMouse)
+            {
+                if (available)
+                {
+                    if (Forevers.Instance == null)
+                        Forevers.ShowWindow();
+                    Forevers.Instance.AddItem(i.obj);
+                }
+                else ShowNotification(outOfScope);
+            }
+            else
+            {
+                if (available)
+                {
+                    Selection.SetActiveObjectWithContext(i.obj, null);
+                    selectingWithin = i.obj;
+                }
+                else ShowNotification(outOfScope);
+            }
+        }
+    }
+
+    UnityEngine.Object inPanelPing;
+
     public bool AddItem (UnityEngine.Object obj, bool delayRepaint = false)
     {
+        Initialize();
+        if (!unityObjects.Add(obj))
+        {
+            inPanelPing = obj;
+            Repaint();
+            return false;
+        }
         Item item = GetItemFromPool();
         item.obj = obj;
         item.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(obj, null));
-        this.markedObjects.Enqueue(item);
+        this.items.Enqueue(item);
         Item i = GetItemFromPool();
-        if (markedObjects.Count >= SIZE) pool.Push(markedObjects.Dequeue());
+        if (items.Count >= SIZE)
+        {
+            var d = items.Dequeue();
+            unityObjects.Remove(d.obj);
+            pool.Push(d);
+        }
         UpdateCount();
         if (!delayRepaint)
             Repaint();
@@ -166,7 +215,7 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
 
     void UpdateCount ()
     {
-        this.titleContent.text = string.Concat("Laters ", markedObjects.Count, "/", SIZE);
+        this.titleContent.text = string.Concat("Laters ", items.Count, "/", SIZE);
     }
 
     public void AddItemsToMenu(GenericMenu menu)
@@ -176,21 +225,24 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
 
     public void Clear ()
     {
-        markedObjects.Clear();
+        items.Clear();
+        unityObjects.Clear();
         UpdateCount();
     }
 
     void Initialize()
     {
-        if (markedObjects == null) markedObjects = new Queue<Item>();
-        pool = new Stack<Item>(SIZE);
+        if (items == null) items = new Queue<Item>();
+        if (unityObjects == null) unityObjects = new HashSet<UnityEngine.Object>();
+        if (pool == null) pool = new Stack<Item>(SIZE);
         initialized = true;
     }
 
     Item GetItemFromPool ()
     {
-        if (pool.Count > 0) return pool.Pop();
-        else return new Item();
+        Item i = (pool.Count > 0)? pool.Pop() : new Item();
+        i.guiContent = null;
+        return i;
     }
 
     UnityEngine.Object selectingWithin;
@@ -203,7 +255,7 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
             for (int i = 0; i < cache.Length; i++) cache[i] = null;
         }
         int index = 0;
-        using (var e = markedObjects.GetEnumerator())
+        using (var e = items.GetEnumerator())
         {
             while (e.MoveNext())
             {
@@ -215,15 +267,18 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
 
     public void OnAfterDeserialize()
     {
-        if (markedObjects == null) markedObjects = new Queue<Item>();
-        else markedObjects.Clear();
+        if (items == null) items = new Queue<Item>();
+        else items.Clear();
+        if (unityObjects == null) unityObjects = new HashSet<UnityEngine.Object>();
+        else unityObjects.Clear();
 
         if (cache == null) return;
 
         for (int i = 0; i < cache.Length; i++)
         {
             if (cache[i] == null || cache[i].obj == null) continue;
-            markedObjects.Enqueue(cache[i]);
+            items.Enqueue(cache[i]);
+            unityObjects.Add(cache[i].obj);
         }
         UpdateCount();
     }

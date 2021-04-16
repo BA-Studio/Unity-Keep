@@ -57,55 +57,57 @@ public class Recents : EditorWindow, ISerializationCallbackReceiver
 
         int size, index;
         size = recentObjects.Count;
-        index = 0;
+        index = -1;
 
         using (var e = recentObjects.GetEnumerator())
         {
             while (e.MoveNext())
             {
+                index++;
                 int y = (size - index - 1) * 33;
                 if (y > position.height)
                 {
-                    index++;
                     continue;
                 }
 
-                Rect r = GUILayoutUtility.GetRect(position.width, 32);
-                GUILayout.Space(1);
-
-                bool available = true;
-                if (e.Current.obj == null) available = false;
-                if (e.Current.guiContent == null)
-                    e.Current.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(e.Current.obj, null));
-
-                if (GUI.Button(r, e.Current.guiContent, available? styleAvailable : styleUnavailable))
-                {
-                    
-                    if (available)
-                    {
-                        
-                        if (Event.current.button == 1) // Right mouse button
-                        {
-                            if (Laters.Instance != null) Laters.Instance.AddItem(e.Current.obj);
-                            else if (Forevers.Instance != null) Forevers.Instance.AddItem(e.Current.obj);
-                            else
-                            {
-                                Laters.ShowWindow();
-                                Laters.Instance.AddItem(e.Current.obj);
-                            }
-                        }
-                        else
-                        {
-                            Selection.SetActiveObjectWithContext(e.Current.obj, null);
-                            selectingWithin = e.Current.obj;
-                        }
-                    }
-                    else ShowNotification(outOfScope);
-                }
-                index++;
+                Rect r = new Rect(0, y, position.width, 32);
+                DrawItem(e.Current, r);
             }
         }
 
+    }
+
+    void DrawItem (Item i, Rect r)
+    {
+        bool available = true;
+        if (i.obj == null) available = false;
+        if (i.guiContent == null)
+            i.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(i.obj, null));
+
+        if (GUI.Button(r, i.guiContent, available? styleAvailable : styleUnavailable))
+        {
+            
+            if (available)
+            {
+                
+                if (Event.current.button == 1) // Right mouse button
+                {
+                    if (Laters.Instance != null) Laters.Instance.AddItem(i.obj);
+                    else if (Forevers.Instance != null) Forevers.Instance.AddItem(i.obj);
+                    else
+                    {
+                        Laters.ShowWindow();
+                        Laters.Instance.AddItem(i.obj);
+                    }
+                }
+                else
+                {
+                    Selection.SetActiveObjectWithContext(i.obj, null);
+                    selectingWithin = i.obj;
+                }
+            }
+            else ShowNotification(outOfScope);
+        }
     }
 
     void Initialize()
