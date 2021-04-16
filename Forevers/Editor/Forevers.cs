@@ -186,6 +186,7 @@ public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustom
                         if (Event.current.button == (int) MouseButton.RightMouse)
                         {
                             deferredRemoving.Add(e.Current);
+                            UpdateCount();
                             repaint = true;
                             break;
                         }
@@ -204,7 +205,6 @@ public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustom
 
         if (repaint)
         {
-            UpdateCount();
             Repaint();
         }
     }
