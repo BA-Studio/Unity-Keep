@@ -236,6 +236,7 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
     {
         items.Clear();
         unityObjects.Clear();
+        itemsReversed.Clear();
         UpdateCount();
     }
 
