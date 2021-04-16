@@ -140,12 +140,19 @@ public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustom
                     
                     repaint = true;
                     deferredRemoving.Clear();
+                    UpdateCount();
                 }
                 break;
             }
         }
         
         EditorGUIUtility.SetIconSize(new Vector2(24f, 24f));
+        
+        if (items.Count * ITEM_PADDED < position.height/3)
+        {
+            GUI.Label(new Rect(0, 0, position.width, position.height), "Left click to select\nRight click to remove", styleHint);
+        }
+
         if (items.Count == 0) return;
 
         int size, index;
@@ -193,7 +200,6 @@ public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustom
                         if (Event.current.button == (int) MouseButton.RightMouse)
                         {
                             deferredRemoving.Add(e.Current);
-                            UpdateCount();
                             repaint = true;
                             break;
                         }
@@ -210,10 +216,6 @@ public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustom
             if (lastVisibleIndex < items.Count - 1) GUILayoutUtility.GetRect(position.width, (items.Count - 1 - lastVisibleIndex) * ITEM_PADDED);
         }
 
-        if (items.Count * ITEM_PADDED < position.height/3)
-        {
-            GUI.Label(new Rect(0, 0, position.width, position.height), "Left click to select\nRight click to remove", styleHint);
-        }
 
         if (repaint)
         {

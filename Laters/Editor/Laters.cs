@@ -96,6 +96,12 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
         
 
         EditorGUIUtility.SetIconSize(new Vector2(24f, 24f));
+        
+
+        if (items.Count * ITEM_PADDED < position.height/3)
+        {
+            GUI.Label(new Rect(0, 0, position.width, position.height), "Left click to select\nRight click to Forevers", styleHint);
+        }
         if (items.Count == 0) return;
 
         int size, index;
@@ -143,11 +149,6 @@ public class Laters : EditorWindow, ISerializationCallbackReceiver, IHasCustomMe
             }
 
             if (lowerCulled > 0) GUILayoutUtility.GetRect(position.width, lowerCulled * ITEM_PADDED);
-        }
-
-        if (items.Count * ITEM_PADDED < position.height/3)
-        {
-            GUI.Label(new Rect(0, 0, position.width, position.height), "Left click to select\nRight click to Forevers", styleHint);
         }
 
         if (repaint)
