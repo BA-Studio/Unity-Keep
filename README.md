@@ -7,6 +7,7 @@ Unity plugin. Minimal & Efficient.
 | - |----------------------------------------------------|-------------------------------------|-------------------------------------|
 | **Purpose** | What you will be using when working on the project | What you will be using today        | What you just used                  |
 | **Usage** | Drag or Save from Laters/Recents                   | Drag or Save from Recents           | Selection                           |
+| **Ordering** | Last at last (List) | Last on top (Queue) | Last on top (Queue) |
 | **Example** | Main Scene | Prefab you are working on | - |
 
 
