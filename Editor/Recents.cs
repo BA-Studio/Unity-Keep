@@ -43,7 +43,9 @@ namespace BAStudio.Keep
 
             if (items.Count * ITEM_PADDED < position.height/3)
             {
-                if (Forevers.Instance != null)
+                if (Laters.Instance != null)
+                    GUI.Label(new Rect(0, 0, position.width, position.height), "Left click to select\nRight click to Laters\nLatest on top", Keep.StyleHint);
+                else if (Forevers.Instance != null)
                     GUI.Label(new Rect(0, 0, position.width, position.height), "Left click to select\nRight click to Forevers\nLatest on top", Keep.StyleHint);
                 else GUI.Label(new Rect(0, 0, position.width, position.height), "Left click to select\nRight click to Laters\nLatest on top", Keep.StyleHint);
             }
