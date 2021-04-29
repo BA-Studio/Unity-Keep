@@ -27,8 +27,6 @@ namespace BAStudio.Keep
             Instance = EditorWindow.GetWindow<Recents>("Recents");
         }
 
-        GUIContent outOfScope = new GUIContent("Selected object\nis out of scope!");
-
         void OnEnable ()
         {
             if (Instance == null) Instance = this;
@@ -110,7 +108,7 @@ namespace BAStudio.Keep
                         }
                     }
                 }
-                else ShowNotification(outOfScope);
+                else ShowNotification(Keep.outOfScope);
             }
         }
 

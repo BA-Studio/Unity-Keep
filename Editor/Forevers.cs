@@ -166,7 +166,7 @@ namespace BAStudio.Keep
                         bool available = true;
                         if (e.Current.obj == null) available = false;
                         if (e.Current.guiContent == null)
-                            e.Current.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(e.Current.obj, null));
+                            e.Current.guiContent = Keep.NewGUIContentAnnotatePathIfFolder(e.Current.obj);
 
                         if (GUI.Button(r, e.Current.guiContent, available? (selectingWithin == e.Current.obj && Selection.activeObject == e.Current.obj)? Keep.StyleItemSelected : Keep.StyleItem : Keep.StyleItemUnavailable))
                         {
@@ -186,7 +186,7 @@ namespace BAStudio.Keep
                                 {
                                     Selection.SetActiveObjectWithContext(e.Current.obj, null);
                                     selectingWithin = e.Current.obj;
-                                    reapint = true;
+                                    repaint = true;
                                 }
 
                             }

@@ -147,7 +147,7 @@ namespace BAStudio.Keep
             bool available = true, repaint = false;
             if (i.obj == null) available = false;
             if (i.guiContent == null)
-                i.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(i.obj, null));
+                i.guiContent = Keep.NewGUIContentAnnotatePathIfFolder(i.obj);
 
             if (GUI.Button(r, i.guiContent, available? (selectingWithin == i.obj && Selection.activeObject == i.obj)? Keep.StyleItemSelected : Keep.StyleItem : Keep.StyleItemUnavailable))
             {
@@ -191,7 +191,6 @@ namespace BAStudio.Keep
             }
             Item item = GetItemFromPool();
             item.obj = obj;
-            item.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(obj, null));
             this.items.Enqueue(item);
             this.itemsReversed.Insert(0, item);
             Item i = GetItemFromPool();

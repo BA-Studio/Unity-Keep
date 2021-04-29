@@ -1,3 +1,4 @@
+using UnityEditor;
 using UnityEngine;
 
 namespace BAStudio.Keep
@@ -33,6 +34,7 @@ namespace BAStudio.Keep
                     styleItemSelected.alignment = TextAnchor.MiddleLeft;
                     styleItemSelected.fontStyle = FontStyle.Bold;
                     styleItemSelected.fontSize = 16;
+                    styleItemSelected.richText = true;
 
                 }
                 return styleItemSelected;
@@ -62,7 +64,7 @@ namespace BAStudio.Keep
                     styleItem = new GUIStyle(GUI.skin.button);
                     styleItem.alignment = TextAnchor.MiddleLeft;
                     styleItem.fontSize = 16;
-
+                    styleItem.richText = true;
                 }
                 return styleItem;
             }
@@ -70,6 +72,21 @@ namespace BAStudio.Keep
 
         internal static GUIContent outOfScope = new GUIContent("Selected object\nis out of scope!");
         internal static GUIContent full = new GUIContent("Storage full!\nClear the list for\nbest productivity👊");
+
+        internal static GUIContent NewGUIContentAnnotatePathIfFolder (UnityEngine.Object obj)
+        {
+            string path = AssetDatabase.GetAssetPath(obj);
+            if (AssetDatabase.IsValidFolder(path))
+            {
+                var c = new GUIContent(EditorGUIUtility.ObjectContent(obj, null));
+                c.text += " <size=8><color=grey>" + path + "</color></size>";
+                return c;
+            }
+            else
+            {
+                return new GUIContent(EditorGUIUtility.ObjectContent(obj, null));
+            }
+        }
 
     }
 }
