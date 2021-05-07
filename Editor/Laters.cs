@@ -26,7 +26,7 @@ namespace BAStudio.Keep
                 Instance.ShowNotification(new GUIContent("I'm here!"));
                 return;
             }
-            Instance = EditorWindow.GetWindow<Laters>();
+            Instance = EditorWindow.GetWindow<Laters>("Keep.Laters");
         }
 
         void OnEnable ()
@@ -209,7 +209,7 @@ namespace BAStudio.Keep
 
         void UpdateCount ()
         {
-            this.titleContent.text = string.Concat("Laters ", items.Count, "/", SIZE);
+            this.titleContent.text = string.Concat("Keep.Laters ", items.Count, "/", SIZE);
         }
 
         public void AddItemsToMenu(GenericMenu menu)

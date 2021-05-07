@@ -24,7 +24,7 @@ namespace BAStudio.Keep
                 Instance.ShowNotification(new GUIContent("I'm here!"));
                 return;
             }
-            Instance = EditorWindow.GetWindow<Recents>("Recents");
+            Instance = EditorWindow.GetWindow<Recents>("Keep.Recents");
         }
 
         void OnEnable ()
