@@ -185,7 +185,8 @@ namespace BAStudio.Keep
 
                     if (r.Contains(Event.current.mousePosition))
                     {
-                        info = e.Current.obj.name;
+                        if (e.Current.obj != null) info = e.Current.obj.name;
+                        else info = "Warning: object inaccessible";
                     }
 
                     pos.c++;
@@ -204,6 +205,7 @@ namespace BAStudio.Keep
                 Repaint();
             }
         }
+
 
         public bool AddItem (UnityEngine.Object obj, bool delayRepaint = false)
         {
