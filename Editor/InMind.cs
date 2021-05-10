@@ -12,6 +12,7 @@ namespace BAStudio.Keep
 {
     public class InMind : EditorWindow, ISerializationCallbackReceiver, IHasCustomMenu
     {
+        public static int uid;
         public static InMind Instance { get; private set; }
         static readonly int SIZE = 30, ITEM_SIZE = 32, PADDING = 1, ITEM_PADDED = 33;
         bool initialized;
@@ -20,6 +21,8 @@ namespace BAStudio.Keep
         HashSet<UnityEngine.Object> unityObjects;
         HashSet<Item> deferredRemoving;
         Stack<Item> pool;
+
+        GUIStyle styleItemUID;
 
         [MenuItem("Window/BAStudio/InMind")]
         public static void ShowWindow()
@@ -30,7 +33,7 @@ namespace BAStudio.Keep
                 return;
             }
             Instance = EditorWindow.GetWindow<InMind>("Keep.InMind");
-            Instance.minSize = new Vector2(95, 32);
+            Instance.minSize = new Vector2(128, 32);
             Instance.wantsMouseMove = true;
         }
         bool latersEnabled;
@@ -40,16 +43,23 @@ namespace BAStudio.Keep
             if (Instance == null) Instance = this;
 
             initialized = false;
+
+            uid = PlayerPrefs.GetInt("Editor.BAStudio.InMind:UID");
+        }
+
+        void OnDisable ()
+        {
+            PlayerPrefs.SetInt("Editor.BAStudio.InMind:UID", uid);
         }
 
         void Awake ()
         {
             string[] stored = PlayerPrefs.GetString("Editor.BAStudio.InMind").Split(';');
-            foreach (string s in stored)
+            for (int i = 0; i < stored.Length; i+=2)
             {
-                if (string.IsNullOrEmpty(s)) continue;
-                UnityEngine.Object o = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(s);
-                AddItem(o, true);
+                if (string.IsNullOrEmpty(stored[i])) continue;
+                UnityEngine.Object o = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(stored[i]);
+                AddItem(o, true, stored[i+1]);
             }
             Repaint();
         }
@@ -71,6 +81,8 @@ namespace BAStudio.Keep
                 {
                     sb.Append(AssetDatabase.GetAssetPath(cache[i].obj));
                     sb.Append(";");
+                    sb.Append(cache[i].uid);
+                    sb.Append(";");
                 }
             }
             // UnityEngine.Debug.Log(sb.ToString());
@@ -82,6 +94,15 @@ namespace BAStudio.Keep
 
         void OnGUI ()
         {
+
+            if (styleItemUID == null)
+            {
+                styleItemUID = new GUIStyle(GUI.skin.label);
+                styleItemUID.fontSize = 8;
+                styleItemUID.alignment = TextAnchor.LowerCenter;
+                styleItemUID.normal.textColor = new Color(214f/255f, 150f/255f, 0);
+            }
+
             if (!initialized) Initialize();
 
             bool repaint = false;
@@ -154,7 +175,7 @@ namespace BAStudio.Keep
                     if (e.Current.obj == null) available = false;
                     if (e.Current.guiContent == null)
                     {
-                        e.Current.guiContent = Keep.NewGUIContentAnnotatePathIfFolder(e.Current.obj);
+                        e.Current.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(e.Current.obj, null));
                         e.Current.guiContent.text = null;
                     }
 
@@ -183,6 +204,8 @@ namespace BAStudio.Keep
                         else ShowNotification(Keep.outOfScope);
                     }
 
+                    GUI.Label(new Rect(r.x, r.y + 4, r.width, r.height), e.Current.uid, styleItemUID);
+
                     if (r.Contains(Event.current.mousePosition))
                     {
                         if (e.Current.obj != null) info = e.Current.obj.name;
@@ -207,9 +230,9 @@ namespace BAStudio.Keep
         }
 
 
-        public bool AddItem (UnityEngine.Object obj, bool delayRepaint = false)
+        public bool AddItem (UnityEngine.Object obj, bool delayRepaint = false, string uid = null)
         {
-            Initialize();
+            if (!initialized) Initialize();
             if (items.Count >= SIZE)
             {
                 ShowNotification(Keep.full);
@@ -218,6 +241,12 @@ namespace BAStudio.Keep
             if (!unityObjects.Add(obj)) return false;
             Item item = GetItemFromPool();
             item.obj = obj;
+            if (uid == null)
+            {
+                item.uid = "#"+InMind.uid.ToString();
+                InMind.uid++;
+            }
+            else item.uid = uid;
             this.items.Add(item);
             if (!delayRepaint)
                 Repaint();
@@ -247,6 +276,7 @@ namespace BAStudio.Keep
             if (unityObjects == null) unityObjects = new HashSet<UnityEngine.Object>();
             if (deferredRemoving == null) deferredRemoving = new HashSet<Item>();
             if (pool == null) pool = new Stack<Item>(SIZE);
+
             initialized = true;
         }
 
@@ -279,6 +309,8 @@ namespace BAStudio.Keep
 
         public void OnAfterDeserialize()
         {
+
+            initialized = false;
             if (items == null) items = new HashSet<Item>();
             if (unityObjects == null) unityObjects = new HashSet<UnityEngine.Object>();
             else items.Clear();
@@ -288,13 +320,14 @@ namespace BAStudio.Keep
             for (int i = 0; i < cache.Length; i++)
             {
                 if (cache[i] == null || cache[i].obj == null) continue;
-                AddItem(cache[i].obj);
+                AddItem(cache[i].obj, true, cache[i].uid);
             }
         }
 
         [Serializable]
         class Item
         {
+            public string uid;
             public UnityEngine.Object obj;
             public GUIContent guiContent;
         }
