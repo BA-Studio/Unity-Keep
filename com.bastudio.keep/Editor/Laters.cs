@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.Experimental.UIElements;
 
 namespace BAStudio.Keep
 {
@@ -151,7 +149,7 @@ namespace BAStudio.Keep
 
             if (GUI.Button(r, i.guiContent, available? (selectingWithin == i.obj && Selection.activeObject == i.obj)? Keep.StyleItemSelected : Keep.StyleItem : Keep.StyleItemUnavailable))
             {
-                if (Event.current.button == (int) MouseButton.RightMouse)
+                if (Event.current.button == 1)
                 {
                     if (available)
                     {

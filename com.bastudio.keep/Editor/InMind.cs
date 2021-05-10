@@ -1,16 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using UnityEngine;
 using UnityEditor;
-using UnityEngine.Experimental.UIElements;
 using System.Text;
 
 namespace BAStudio.Keep
 {
-    public class Forevers : EditorWindow, ISerializationCallbackReceiver, IHasCustomMenu
+    public class InMind : EditorWindow, ISerializationCallbackReceiver, IHasCustomMenu
     {
-        public static Forevers Instance { get; private set; }
+        public static int uid;
+        public static InMind Instance { get; private set; }
         static readonly int SIZE = 30, ITEM_SIZE = 32, PADDING = 1, ITEM_PADDED = 33;
         bool initialized;
         [SerializeField] Item[] cache;
@@ -19,7 +18,9 @@ namespace BAStudio.Keep
         HashSet<Item> deferredRemoving;
         Stack<Item> pool;
 
-        [MenuItem("Window/BAStudio/Forevers")]
+        GUIStyle styleItemUID;
+
+        [MenuItem("Window/BAStudio/InMind")]
         public static void ShowWindow()
         {
             if (Instance != null)
@@ -27,24 +28,34 @@ namespace BAStudio.Keep
                 Instance.ShowNotification(new GUIContent("I'm here!"));
                 return;
             }
-            Instance = EditorWindow.GetWindow<Forevers>("Keep.Forevers");
+            Instance = EditorWindow.GetWindow<InMind>("Keep.InMind");
+            Instance.minSize = new Vector2(128, 32);
+            Instance.wantsMouseMove = true;
         }
         bool latersEnabled;
 
         void OnEnable ()
         {
             if (Instance == null) Instance = this;
+
             initialized = false;
+
+            uid = PlayerPrefs.GetInt("Editor.BAStudio.InMind:UID");
+        }
+
+        void OnDisable ()
+        {
+            PlayerPrefs.SetInt("Editor.BAStudio.InMind:UID", uid);
         }
 
         void Awake ()
         {
-            string[] stored = PlayerPrefs.GetString("Editor.BAStudio.Forevers").Split(';');
-            foreach (string s in stored)
+            string[] stored = PlayerPrefs.GetString("Editor.BAStudio.InMind").Split(';');
+            for (int i = 0; i < stored.Length; i+=2)
             {
-                if (string.IsNullOrEmpty(s)) continue;
-                UnityEngine.Object o = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(s);
-                AddItem(o, true);
+                if (string.IsNullOrEmpty(stored[i])) continue;
+                UnityEngine.Object o = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(stored[i]);
+                AddItem(o, true, stored[i+1]);
             }
             Repaint();
         }
@@ -66,10 +77,12 @@ namespace BAStudio.Keep
                 {
                     sb.Append(AssetDatabase.GetAssetPath(cache[i].obj));
                     sb.Append(";");
+                    sb.Append(cache[i].uid);
+                    sb.Append(";");
                 }
             }
             // UnityEngine.Debug.Log(sb.ToString());
-            PlayerPrefs.SetString("Editor.BAStudio.Forevers", sb.ToString());
+            PlayerPrefs.SetString("Editor.BAStudio.InMind", sb.ToString());
         }
 
         [SerializeField] Vector2 scroll;
@@ -77,6 +90,15 @@ namespace BAStudio.Keep
 
         void OnGUI ()
         {
+
+            if (styleItemUID == null)
+            {
+                styleItemUID = new GUIStyle(GUI.skin.label);
+                styleItemUID.fontSize = 8;
+                styleItemUID.alignment = TextAnchor.LowerCenter;
+                styleItemUID.normal.textColor = new Color(214f/255f, 150f/255f, 0);
+            }
+
             if (!initialized) Initialize();
 
             bool repaint = false;
@@ -113,91 +135,89 @@ namespace BAStudio.Keep
                         
                         repaint = true;
                         deferredRemoving.Clear();
-                        UpdateCount();
                     }
                     break;
                 }
             }
             
             EditorGUIUtility.SetIconSize(new Vector2(24f, 24f));
-            
-            if (items.Count * ITEM_PADDED < position.height/3)
-            {
-                GUI.Label(new Rect(0, 0, position.width, position.height), "Left click to select\nRight click to remove", Keep.StyleHint);
-            }
 
             if (items.Count == 0) return;
 
-            int size, index;
-            size = items.Count;
-            index = -1;
+            int index = -1;
 
-            using (var scrollView = new EditorGUILayout.ScrollViewScope(scroll, GUIStyle.none, GUI.skin.verticalScrollbar))
+            int col = (int) Math.Floor(position.width / ITEM_SIZE);
+            int row = (int) Math.Floor(position.height / ITEM_SIZE);
+            (int c, int r) pos = (0, 0);
+            string info = string.Empty;
+
+            using (var e = items.GetEnumerator())
             {
-                scroll = scrollView.scrollPosition;
-
-                // Optimization: Draw only visible control and compress all invisible control to 2 rects (upper/lower)
-                // Calculate upper/lower palceholder height
-                if (Event.current.type == EventType.Layout)
+                while (e.MoveNext())
                 {
-                float upperBound = scroll.y;
-                float lowerBound = scroll.y + position.height;
-                firstVisibleIndex = (int) Mathf.Floor((upperBound - ITEM_SIZE) / (float) ITEM_PADDED) + 1;
-                if (upperBound < ITEM_SIZE) firstVisibleIndex = 0; // The above calculation does not guarantee first item. Override
-                lastVisibleIndex = (int) Mathf.Ceil(lowerBound / (float) ITEM_PADDED);
-                }
-
-                if (firstVisibleIndex > 0) GUILayoutUtility.GetRect(position.width, firstVisibleIndex * ITEM_PADDED);
-
-                using (var e = items.GetEnumerator())
-                {
-                    while (e.MoveNext())
+                    index++;
+                    if (pos.c >= col)
                     {
-                        index++;
-                        // UnityEngine.Debug.LogFormat("Index: {0}, {1}~{2}, Scroll:{3} / {4} -> {5}", index, firstVisibleIndex, lastVisibleIndex, scroll.y, position.height, e.Current.obj.name);
-                        if (index < firstVisibleIndex || index > lastVisibleIndex)
-                        {
-                            continue;
-                        }
-
-                        Rect r = GUILayoutUtility.GetRect(position.width, ITEM_SIZE);
-                        GUILayout.Space(1);
-
-                        bool available = true;
-                        if (e.Current.obj == null) available = false;
-                        if (e.Current.guiContent == null)
-                            e.Current.guiContent = Keep.NewGUIContentAnnotatePathIfFolder(e.Current.obj);
-
-                        if (GUI.Button(r, e.Current.guiContent, available? (selectingWithin == e.Current.obj && Selection.activeObject == e.Current.obj)? Keep.StyleItemSelected : Keep.StyleItem : Keep.StyleItemUnavailable))
-                        {
-                            if (Event.current.button == (int) MouseButton.RightMouse)
-                            {
-                                deferredRemoving.Add(e.Current);
-                                repaint = true;
-                                break;
-                            }
-                            else if (available)
-                            {
-                                if (selectingWithin == e.Current.obj && Selection.activeObject == e.Current.obj && AssetDatabase.Contains(e.Current.obj))
-                                {
-                                    AssetDatabase.OpenAsset(e.Current.obj);
-                                }
-                                else
-                                {
-                                    Selection.SetActiveObjectWithContext(e.Current.obj, null);
-                                    selectingWithin = e.Current.obj;
-                                    repaint = true;
-                                }
-
-                            }
-                            else ShowNotification(Keep.outOfScope);
-                        }
+                        pos.c = 0;
+                        pos.r++;
                     }
-                }
-                
-                if (lastVisibleIndex < items.Count - 1) GUILayoutUtility.GetRect(position.width, (items.Count - 1 - lastVisibleIndex) * ITEM_PADDED);
-            }
+                    // UnityEngine.Debug.LogFormat("Index: {0}, {1}~{2}, Scroll:{3} / {4} -> {5}", index, firstVisibleIndex, lastVisibleIndex, scroll.y, position.height, e.Current.obj.name);
+                    
+                    
 
+                    Rect r = new Rect(pos.c * ITEM_SIZE, pos.r * ITEM_SIZE, ITEM_SIZE, ITEM_SIZE);
+
+                    bool available = true;
+                    if (e.Current.obj == null) available = false;
+                    if (e.Current.guiContent == null)
+                    {
+                        e.Current.guiContent = new GUIContent(EditorGUIUtility.ObjectContent(e.Current.obj, null));
+                        e.Current.guiContent.text = null;
+                    }
+
+                    if (GUI.Button(r, e.Current.guiContent, available? (selectingWithin == e.Current.obj && Selection.activeObject == e.Current.obj)? Keep.StyleItemSelected : Keep.StyleItem : Keep.StyleItemUnavailable))
+                    {
+                        if (Event.current.button == 1)
+                        {
+                            deferredRemoving.Add(e.Current);
+                            repaint = true;
+                            break;
+                        }
+                        else if (available)
+                        {
+                            if (selectingWithin == e.Current.obj && Selection.activeObject == e.Current.obj && AssetDatabase.Contains(e.Current.obj))
+                            {
+                                AssetDatabase.OpenAsset(e.Current.obj);
+                            }
+                            else
+                            {
+                                Selection.SetActiveObjectWithContext(e.Current.obj, null);
+                                selectingWithin = e.Current.obj;
+                                repaint = true;
+                            }
+
+                        }
+                        else ShowNotification(Keep.outOfScope);
+                    }
+
+                    GUI.Label(new Rect(r.x, r.y + 4, r.width, r.height), e.Current.uid, styleItemUID);
+
+                    if (r.Contains(Event.current.mousePosition))
+                    {
+                        if (e.Current.obj != null) info = e.Current.obj.name;
+                        else info = "Warning: object inaccessible";
+                    }
+
+                    pos.c++;
+                }
+            }
+            if (!string.IsNullOrEmpty(info))
+            {
+                Rect rect = new Rect(0, position.height - 18, position.width, 18);
+                EditorGUI.DrawRect(rect, new Color(0, 0, 0, 0.5f));
+                GUI.Label(rect, info);
+                repaint = true;
+            }
 
             if (repaint)
             {
@@ -205,9 +225,10 @@ namespace BAStudio.Keep
             }
         }
 
-        public bool AddItem (UnityEngine.Object obj, bool delayRepaint = false)
+
+        public bool AddItem (UnityEngine.Object obj, bool delayRepaint = false, string uid = null)
         {
-            Initialize();
+            if (!initialized) Initialize();
             if (items.Count >= SIZE)
             {
                 ShowNotification(Keep.full);
@@ -216,8 +237,13 @@ namespace BAStudio.Keep
             if (!unityObjects.Add(obj)) return false;
             Item item = GetItemFromPool();
             item.obj = obj;
+            if (uid == null)
+            {
+                item.uid = "#"+InMind.uid.ToString();
+                InMind.uid++;
+            }
+            else item.uid = uid;
             this.items.Add(item);
-            UpdateCount();
             if (!delayRepaint)
                 Repaint();
             return true;
@@ -229,11 +255,6 @@ namespace BAStudio.Keep
             items.Remove(i);
         }
 
-        void UpdateCount ()
-        {
-            this.titleContent.text = string.Concat("Keep.Forevers ", items.Count, "/", SIZE);
-        }
-
         public void AddItemsToMenu(GenericMenu menu)
         {
             menu.AddItem(new GUIContent("Clear"), false, Clear);
@@ -243,7 +264,6 @@ namespace BAStudio.Keep
         {
             items.Clear();
             unityObjects.Clear();
-            UpdateCount();
         }
 
         void Initialize()
@@ -252,6 +272,7 @@ namespace BAStudio.Keep
             if (unityObjects == null) unityObjects = new HashSet<UnityEngine.Object>();
             if (deferredRemoving == null) deferredRemoving = new HashSet<Item>();
             if (pool == null) pool = new Stack<Item>(SIZE);
+
             initialized = true;
         }
 
@@ -284,6 +305,8 @@ namespace BAStudio.Keep
 
         public void OnAfterDeserialize()
         {
+
+            initialized = false;
             if (items == null) items = new HashSet<Item>();
             if (unityObjects == null) unityObjects = new HashSet<UnityEngine.Object>();
             else items.Clear();
@@ -293,14 +316,14 @@ namespace BAStudio.Keep
             for (int i = 0; i < cache.Length; i++)
             {
                 if (cache[i] == null || cache[i].obj == null) continue;
-                AddItem(cache[i].obj);
+                AddItem(cache[i].obj, true, cache[i].uid);
             }
-            UpdateCount();
         }
 
         [Serializable]
         class Item
         {
+            public string uid;
             public UnityEngine.Object obj;
             public GUIContent guiContent;
         }

@@ -1,0 +1,20 @@
+{
+    "name": "com.bastudio.keep",
+    "version": "1.0.0",
+    "displayName": "Keep",
+    "description": "Record your selection and keep anything handy",
+    "unity": "2018.4",
+    "keywords": [
+        "tool",
+        "favorite",
+        "selecton",
+        "productivity",
+        "accessbility"
+    ],
+    "author":
+    {
+        "name": "BA",
+        "email": "badevstudio@gmail.com",
+        "url": "https://no3371.github.io/blog"
+    }
+}
