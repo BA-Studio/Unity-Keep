@@ -33,7 +33,7 @@ namespace BAStudio.Keep
                 return;
             }
             Instance = EditorWindow.GetWindow<InMind>("Keep.InMind");
-            Instance.minSize = new Vector2(128, 32);
+            Instance.minSize = new Vector2(32), 32);
             Instance.wantsMouseMove = true;
         }
         bool latersEnabled;
@@ -217,7 +217,8 @@ namespace BAStudio.Keep
             }
             if (!string.IsNullOrEmpty(info))
             {
-                Rect rect = new Rect(0, position.height - 18, position.width, 18);
+                var h = Mathf.Max(18, position.height * 0.33f);
+                Rect rect = new Rect(0, position.height - h, position.width, h);
                 EditorGUI.DrawRect(rect, new Color(0, 0, 0, 0.5f));
                 GUI.Label(rect, info);
                 repaint = true;
