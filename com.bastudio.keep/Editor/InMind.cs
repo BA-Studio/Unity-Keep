@@ -29,7 +29,7 @@ namespace BAStudio.Keep
                 return;
             }
             Instance = EditorWindow.GetWindow<InMind>("Keep.InMind");
-            Instance.minSize = new Vector2(32), 32);
+            Instance.minSize = new Vector2(32, 32);
             Instance.wantsMouseMove = true;
         }
         bool latersEnabled;
