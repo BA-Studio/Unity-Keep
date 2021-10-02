@@ -1,5 +1,5 @@
 # Keep
-TW | [EN]()
+TW | [EN](https://github.com/BA-Studio/Unity-Keep/blob/master/README_TW.md)
 
 | **Panel** | Forevers                                           | Laters                              | Recents                             | InMind |
 | - |----------------------------------------------------|-------------------------------------|-------------------------------------| --- |
